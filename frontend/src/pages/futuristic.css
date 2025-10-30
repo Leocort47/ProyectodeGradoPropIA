@@ -1,0 +1,57 @@
+:root {
+  --bg:#0b0f1a; --panel:#0f1524; --edge:#1c2740; --ink:#e6f0ff; --muted:#9cc3ff; --accent:#6ae6ff; --accent2:#a88cff;
+}
+*{box-sizing:border-box}
+body,#root,.stage{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%,#111a2e 0,#0b0f1a 40%,#090d18 100%);color:var(--ink);font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+.topbar{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:rgba(10,14,25,.6);backdrop-filter:blur(8px);border-bottom:1px solid #111825}
+.brand{font-weight:700;letter-spacing:.5px}
+.menu a{margin:0 12px;color:var(--muted);text-decoration:none}
+.chip{margin-left:12px;padding:6px 10px;border-radius:999px;border:1px solid #1a2340}
+.chip.on{background:linear-gradient(90deg,#153 0,#0a2 100%);box-shadow:0 0 24px rgba(86,248,130,.28)}
+.hero{display:grid;grid-template-columns:1.2fr .9fr;gap:32px;padding:48px 24px;align-items:center}
+.hero h1{font-size:52px;line-height:1.05;background:linear-gradient(180deg,#bfe1ff,#9cc3ff,#6ae6ff);-webkit-background-clip:text;color:transparent;margin:0 0 14px}
+.hero p{color:#cfe2ff;max-width:560px}
+.stats{display:flex;gap:28px;margin-top:16px}
+.stats strong{font-size:36px;display:block;color:#bfe1ff}
+.stats span{color:#89a8d4;font-size:14px}
+.aria{background:linear-gradient(160deg,rgba(24,32,54,.8),rgba(15,21,36,.8));border:1px solid var(--edge);border-radius:14px;padding:16px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.aria-head{display:flex;gap:12px;align-items:center;margin-bottom:8px}
+.avatar{width:44px;height:44px;border-radius:12px;background:conic-gradient(from 120deg,#6ae6ff,#a88cff,#6ae6ff);box-shadow:0 0 24px rgba(106,230,255,.35)}
+.aria-name{font-weight:700}
+.aria-status{font-size:12px;color:#78b1ff}
+.bubble{background:#121a2e;border:1px solid #1c2740;border-radius:12px;color:#cfe2ff;padding:12px 14px;margin:12px 0}
+.aria-input{display:flex;gap:10px}
+.aria-input input{flex:1;background:#0e1426;border:1px solid #1b2340;border-radius:12px;padding:12px;color:var(--ink)}
+.btn-mic,.btn-send{width:44px;height:44px;border-radius:14px;border:1px solid #1b2340;background:#0e1426;color:#8ad;cursor:pointer}
+.panel{background:linear-gradient(180deg,rgba(16,22,38,.6),rgba(13,18,32,.6));border-top:1px solid #10172a;margin-top:24px;padding:24px}
+.panel h2{margin:0 0 6px}
+table th, table td{font-size:14px}
+a{color:#8ad}
+.foot{padding:16px;color:#86a0c8;text-align:center;border-top:1px solid #10172a;margin-top:24px}
+@media (max-width:980px){.hero{grid-template-columns:1fr}}
+
+/* En frontend/src/pages/futuristic.css */
+
+.aria-chat {
+  color: #ffffff !important;
+}
+
+.aria-chat input,
+.aria-chat textarea {
+  color: #ffffff !important;
+}
+
+.aria-chat input::placeholder,
+.aria-chat textarea::placeholder {
+  color: #8fa9c8 !important;
+  opacity: 1 !important;
+}
+
+.aria-chat .MuiTypography-root {
+  color: #ffffff !important;
+}
+
+.aria-chat .MuiChip-label {
+  color: #ffffff !important;
+}
+
