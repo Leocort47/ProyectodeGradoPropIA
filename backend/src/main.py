@@ -294,3 +294,161 @@ async def server_error_handler(request, exc):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("src.main:app", host="127.0.0.1", port=8000, reload=True)
+
+
+# Agregar estas importaciones
+from database.database import db, init_database
+import json
+
+# En la inicialización de FastAPI
+@app.on_event("startup")
+async def startup_event():
+    await init_database()
+    logger.info("✅ Base de datos inicializada")
+
+@app.on_event("shutdown") 
+async def shutdown_event():
+    await close_database()
+    logger.info("🔌 Base de datos cerrada")
+
+# Endpoint para guardar propiedades
+@app.post("/api/properties/save")
+async def save_properties(properties: List[Dict]):
+    """Guardar propiedades en la base de datos"""
+    try:
+        stats = await db.save_properties(properties)
+        
+        # Log de la sesión de scraping
+        await db.log_scraping_session(
+            portal="multiple",
+            properties_found=len(properties),
+            properties_saved=stats['guardadas'] + stats['actualizadas'],
+            duration=0,  # Podrías calcular esto
+            status="exitoso" if stats['errores'] == 0 else "parcial",
+            search_params={"source": "api_save"}
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Propiedades guardadas: {stats['guardadas']} nuevas, {stats['actualizadas']} actualizadas",
+            "stats": stats
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error guardando propiedades: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+# Endpoint para búsqueda en base de datos
+@app.get("/api/properties/search")
+async def search_properties(
+    ciudad: str = None,
+    tipo_negocio: str = "venta",
+    tipo_propiedad: str = None,
+    precio_min: float = None,
+    precio_max: float = None,
+    habitaciones_min: int = None,
+    area_min: float = None,
+    portal: str = None,
+    limite: int = 50,
+    ordenar_por: str = "fecha_actualizacion"
+):
+    """Buscar propiedades en la base de datos"""
+    try:
+        filters = {
+            'ciudad': ciudad,
+            'tipo_negocio': tipo_negocio,
+            'tipo_propiedad': tipo_propiedad,
+            'precio_min': precio_min,
+            'precio_max': precio_max,
+            'habitaciones_min': habitaciones_min,
+            'area_min': area_min,
+            'portal': portal,
+            'limite': limite,
+            'ordenar_por': ordenar_por
+        }
+        
+        # Remover filtros None
+        filters = {k: v for k, v in filters.items() if v is not None}
+        
+        properties = await db.search_properties(filters)
+        
+        return {
+            "status": "success",
+            "total": len(properties),
+            "filters": filters,
+            "properties": properties
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error buscando propiedades: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+# Endpoint para estadísticas
+@app.get("/api/properties/stats")
+async def get_properties_stats():
+    """Obtener estadísticas de propiedades"""
+    try:
+        stats = await db.get_property_stats()
+        return {
+            "status": "success",
+            "stats": stats
+        }
+    except Exception as e:
+        logger.error(f"❌ Error obteniendo estadísticas: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+# Endpoint combinado: scrapear y guardar
+@app.post("/api/scrape-and-save")
+async def scrape_and_save(
+    portal: str,
+    ciudad: str = "bucaramanga",
+    tipo_negocio: str = "venta",
+    limite: int = 10
+):
+    """Scrapear propiedades y guardarlas en la base de datos"""
+    try:
+        # Scrapear propiedades
+        if portal == "fincaraiz":
+            from scrapers.fincaraiz_adapter import FincaraizScraper
+            scraper = FincaraizScraper()
+        elif portal == "metrocuadrado":
+            from scrapers.metrocuadrado_adapter import MetrocuadradoScraper
+            scraper = MetrocuadradoScraper()
+        else:
+            return {"status": "error", "message": f"Portal no soportado: {portal}"}
+        
+        propiedades = await scraper.scrape(
+            limit=limite,
+            negocio=tipo_negocio,
+            ciudad=ciudad
+        )
+        
+        # Guardar en base de datos
+        save_stats = await db.save_properties(propiedades)
+        
+        return {
+            "status": "success",
+            "scraping": {
+                "portal": portal,
+                "ciudad": ciudad,
+                "tipo_negocio": tipo_negocio,
+                "propiedades_encontradas": len(propiedades)
+            },
+            "database": save_stats
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error en scrape-and-save: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
