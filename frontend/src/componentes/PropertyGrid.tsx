@@ -27,6 +27,7 @@ export default function PropertyGrid() {
   const [items, setItems] = useState<CardItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [lastSearch, setLastSearch] = useState<'venta' | 'arriendo'>('venta')
 
   // Imagen placeholder para propiedades sin imagen
   const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/400x240/1a2332/6ae6ff?text=Imagen+no+disponible'
@@ -35,13 +36,127 @@ export default function PropertyGrid() {
     try {
       setError(null)
       setLoading(true)
+      setLastSearch(negocio)
+      
+      console.log(`🔄 Iniciando scraping para: ${negocio}`)
+      
       const data = await getFincaRaizCards(10, negocio)
+      
+      console.log(`✅ Scraping completado: ${data.cards?.length || 0} propiedades encontradas`)
+      
       setItems(data.cards || [])
+      
+      if (!data.cards || data.cards.length === 0) {
+        setError('No se encontraron propiedades. Intenta con otros parámetros.')
+      }
     } catch (e: any) {
-      setError(e?.response?.data?.detail || e?.message || 'Error cargando propiedades')
+      console.error('❌ Error en scraping:', e)
+      
+      const errorMessage = e?.response?.data?.detail || e?.message || 'Error cargando propiedades'
+      
+      // Mensajes de error más específicos
+      if (errorMessage.includes('conectar')) {
+        setError('⚠️ No se puede conectar al servidor. Verifica que el backend esté ejecutándose en http://127.0.0.1:8000')
+      } else if (errorMessage.includes('tiempo')) {
+        setError('⏱️ El scraping está tomando demasiado tiempo. El servidor puede estar ocupado. Intenta nuevamente.')
+      } else if (errorMessage.includes('No se encontraron propiedades')) {
+        setError('🏠 No se encontraron propiedades con los criterios actuales. Intenta con "Arriendo" u otras ciudades.')
+      } else {
+        setError(`❌ ${errorMessage}`)
+      }
     } finally {
       setLoading(false)
     }
+  }
+
+  // Cargar propiedades en venta al iniciar
+  useEffect(() => {
+    run('venta')
+  }, [])
+
+  // Función para compartir propiedad
+ const handleShare = async (property: CardItem) => {
+  try {
+    // Validar y proveer valores por defecto
+    const shareTitle = property.title || 'Propiedad en Finca Raíz'
+    const shareText = property.description?.substring(0, 100) || 'Propiedad disponible en el mercado inmobiliario'
+    const shareUrl = property.link || window.location.href
+
+    // Verificar si Web Share API está disponible
+    if (navigator.share) {
+      await navigator.share({
+        title: shareTitle,
+        text: shareText,
+        url: shareUrl,
+      })
+      console.log('Propiedad compartida exitosamente')
+    } else {
+      // Fallback: copiar al portapapeles
+      await navigator.clipboard.writeText(shareUrl)
+      
+      // Mostrar notificación más elegante
+      const notification = document.createElement('div')
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #22c55e;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      `
+      notification.textContent = '✅ Enlace copiado al portapapeles'
+      document.body.appendChild(notification)
+      
+      // Auto-remover después de 3 segundos
+      setTimeout(() => {
+        if (document.body.contains(notification)) {
+          document.body.removeChild(notification)
+        }
+      }, 3000)
+    }
+  } catch (error: any) {
+    console.error('Error al compartir:', error)
+    
+    // No mostrar alerta si el usuario canceló el share
+    if (error.name !== 'AbortError') {
+      // Notificación de error elegante
+      const errorNotification = document.createElement('div')
+      errorNotification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #ef4444;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      `
+      errorNotification.textContent = '❌ Error al compartir la propiedad'
+      document.body.appendChild(errorNotification)
+      
+      setTimeout(() => {
+        if (document.body.contains(errorNotification)) {
+          document.body.removeChild(errorNotification)
+        }
+      }, 3000)
+    }
+  }
+}
+
+  // Función para formatear precios
+  const formatPrice = (price: number) => {
+    if (price >= 1000000) {
+      return `$${(price / 1000000).toFixed(1)}M`
+    } else if (price >= 1000) {
+      return `$${(price / 1000).toFixed(0)}K`
+    }
+    return `$${price}`
   }
 
   return (
@@ -72,7 +187,7 @@ export default function PropertyGrid() {
             fontWeight: 400
           }}
         >
-          Descubre propiedades con información verificada y fotos reales
+          Propiedades verificadas en tiempo real de Finca Raíz
         </Typography>
 
         {/* Estadísticas del Mercado en Cards */}
@@ -168,25 +283,31 @@ export default function PropertyGrid() {
             onClick={() => run('venta')}
             disabled={loading}
             sx={{
-              background: 'linear-gradient(135deg, #6ae6ff, #a78bfa)',
-              color: '#0a0f1a',
+              background: lastSearch === 'venta' 
+                ? 'linear-gradient(135deg, #6ae6ff, #a78bfa)' 
+                : 'rgba(106, 230, 255, 0.2)',
+              color: lastSearch === 'venta' ? '#0a0f1a' : '#6ae6ff',
               fontWeight: 700,
               px: 4,
               py: 1.5,
               fontSize: '1rem',
               borderRadius: '10px',
-              boxShadow: '0 4px 14px rgba(106, 230, 255, 0.4)',
+              boxShadow: lastSearch === 'venta' 
+                ? '0 4px 14px rgba(106, 230, 255, 0.4)' 
+                : 'none',
+              border: lastSearch === 'venta' ? 'none' : '1px solid rgba(106, 230, 255, 0.5)',
               '&:hover': {
                 background: 'linear-gradient(135deg, #5dd5ff, #9775fa)',
                 transform: 'translateY(-2px)',
                 boxShadow: '0 6px 20px rgba(106, 230, 255, 0.5)'
               },
               '&:disabled': {
-                background: 'rgba(106, 230, 255, 0.3)'
+                background: 'rgba(106, 230, 255, 0.1)',
+                color: 'rgba(106, 230, 255, 0.5)'
               }
             }}
           >
-            🏠 Cargar en Venta
+            {loading && lastSearch === 'venta' ? '🔄 Cargando...' : '🏠 Propiedades en Venta'}
           </Button>
           <Button 
             variant="contained" 
@@ -194,25 +315,31 @@ export default function PropertyGrid() {
             onClick={() => run('arriendo')}
             disabled={loading}
             sx={{
-              background: 'linear-gradient(135deg, #a78bfa, #f472b6)',
-              color: '#0a0f1a',
+              background: lastSearch === 'arriendo' 
+                ? 'linear-gradient(135deg, #a78bfa, #f472b6)' 
+                : 'rgba(167, 139, 250, 0.2)',
+              color: lastSearch === 'arriendo' ? '#0a0f1a' : '#a78bfa',
               fontWeight: 700,
               px: 4,
               py: 1.5,
               fontSize: '1rem',
               borderRadius: '10px',
-              boxShadow: '0 4px 14px rgba(167, 139, 250, 0.4)',
+              boxShadow: lastSearch === 'arriendo' 
+                ? '0 4px 14px rgba(167, 139, 250, 0.4)' 
+                : 'none',
+              border: lastSearch === 'arriendo' ? 'none' : '1px solid rgba(167, 139, 250, 0.5)',
               '&:hover': {
                 background: 'linear-gradient(135deg, #9775fa, #e85ba5)',
                 transform: 'translateY(-2px)',
                 boxShadow: '0 6px 20px rgba(167, 139, 250, 0.5)'
               },
               '&:disabled': {
-                background: 'rgba(167, 139, 250, 0.3)'
+                background: 'rgba(167, 139, 250, 0.1)',
+                color: 'rgba(167, 139, 250, 0.5)'
               }
             }}
           >
-            🔑 Cargar en Arriendo
+            {loading && lastSearch === 'arriendo' ? '🔄 Cargando...' : '🔑 Propiedades en Arriendo'}
           </Button>
         </Stack>
 
@@ -258,10 +385,13 @@ export default function PropertyGrid() {
             }} 
           />
           <Typography variant="h5" sx={{ color: '#d0eaff', mb: 1, fontWeight: 600 }}>
-            Scrapeando propiedades...
+            Scrapeando propiedades en tiempo real...
           </Typography>
           <Typography variant="body1" sx={{ color: '#8fa9c8' }}>
             Esto puede tomar 1-2 minutos ⏱️
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#6ae6ff', mt: 1, fontStyle: 'italic' }}>
+            Extrayendo datos actualizados de Finca Raíz
           </Typography>
         </Box>
       )}
@@ -276,14 +406,27 @@ export default function PropertyGrid() {
             border: '1px solid rgba(244, 67, 54, 0.3)',
             borderRadius: '10px',
             color: '#ff6b6b',
-            fontSize: '1rem'
+            fontSize: '1rem',
+            '& .MuiAlert-message': {
+              width: '100%'
+            }
           }}
+          action={
+            <Button 
+              color="inherit" 
+              size="small" 
+              onClick={() => run(lastSearch)}
+              sx={{ color: '#ff6b6b', fontWeight: 600 }}
+            >
+              REINTENTAR
+            </Button>
+          }
         >
-          ⚠️ {error}
+          {error}
         </Alert>
       )}
 
-      {/* Empty State */}
+      {/* Empty State - Solo mostrar si no hay loading ni error */}
       {!loading && items.length === 0 && !error && (
         <Paper
           elevation={0}
@@ -298,16 +441,44 @@ export default function PropertyGrid() {
           <Typography variant="h5" sx={{ color: '#6ae6ff', mb: 2, fontWeight: 600 }}>
             💡 ¡Comienza tu búsqueda!
           </Typography>
-          <Typography variant="body1" sx={{ color: '#9cc3ff' }}>
+          <Typography variant="body1" sx={{ color: '#9cc3ff', mb: 3 }}>
             Haz clic en un botón para cargar propiedades verificadas de Finca Raíz
           </Typography>
+          <Stack direction="row" spacing={2} justifyContent="center">
+            <Button 
+              variant="outlined"
+              onClick={() => run('venta')}
+              sx={{
+                borderColor: '#6ae6ff',
+                color: '#6ae6ff',
+                '&:hover': {
+                  backgroundColor: 'rgba(106, 230, 255, 0.1)'
+                }
+              }}
+            >
+              Buscar en Venta
+            </Button>
+            <Button 
+              variant="outlined"
+              onClick={() => run('arriendo')}
+              sx={{
+                borderColor: '#a78bfa',
+                color: '#a78bfa',
+                '&:hover': {
+                  backgroundColor: 'rgba(167, 139, 250, 0.1)'
+                }
+              }}
+            >
+              Buscar en Arriendo
+            </Button>
+          </Stack>
         </Paper>
       )}
 
       {/* Property Cards Grid */}
       <Grid container spacing={3}>
-        {items.map((p, i) => (
-          <Grid item xs={12} sm={6} md={4} lg={3} key={i}>
+        {items.map((property, index) => (
+          <Grid item xs={12} sm={6} md={4} lg={3} key={index}>
             <Card 
               sx={{ 
                 height: '100%',
@@ -330,7 +501,7 @@ export default function PropertyGrid() {
               }}
             >
               {/* Badge de precio */}
-              {p.price && (
+              {property.price && (
                 <Box
                   sx={{
                     position: 'absolute',
@@ -348,7 +519,7 @@ export default function PropertyGrid() {
                     backdropFilter: 'blur(10px)'
                   }}
                 >
-                  {p.price_text}
+                  {property.price_text || formatPrice(property.price)}
                 </Box>
               )}
 
@@ -379,9 +550,10 @@ export default function PropertyGrid() {
                     <FavoriteIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Compartir" arrow>
+                <Tooltip title="Compartir propiedad" arrow>
                   <IconButton
                     size="small"
+                    onClick={() => handleShare(property)}
                     sx={{
                       backgroundColor: 'rgba(10, 15, 26, 0.8)',
                       backdropFilter: 'blur(10px)',
@@ -413,8 +585,8 @@ export default function PropertyGrid() {
                     objectFit: 'cover',
                     transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
                   }} 
-                  image={p.image_url || PLACEHOLDER_IMAGE}
-                  alt={p.title}
+                  image={property.image_url || PLACEHOLDER_IMAGE}
+                  alt={property.title}
                   onError={(e: any) => {
                     e.target.src = PLACEHOLDER_IMAGE
                   }}
@@ -447,13 +619,13 @@ export default function PropertyGrid() {
                     minHeight: '2.8rem'
                   }}
                 >
-                  {p.title}
+                  {property.title}
                 </Typography>
                 
                 {/* Ubicación */}
                 <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 2 }}>
                   <Typography sx={{ color: '#9cc3ff', fontSize: '0.9rem', fontWeight: 500 }}>
-                    📍 {p.location || 'Bucaramanga, Colombia'}
+                    📍 {property.location || 'Bucaramanga, Colombia'}
                   </Typography>
                 </Stack>
 
@@ -465,9 +637,9 @@ export default function PropertyGrid() {
                   spacing={1} 
                   sx={{ mb: 2, flexWrap: 'wrap', gap: 1 }}
                 >
-                  {p.area_m2 && (
+                  {property.area_m2 && (
                     <Chip 
-                      label={`${p.area_m2} m²`}
+                      label={`${property.area_m2} m²`}
                       size="small"
                       sx={{
                         backgroundColor: 'rgba(106, 230, 255, 0.2)',
@@ -479,9 +651,9 @@ export default function PropertyGrid() {
                       }}
                     />
                   )}
-                  {p.bedrooms && (
+                  {property.bedrooms && (
                     <Chip 
-                      label={`${p.bedrooms} hab`}
+                      label={`${property.bedrooms} hab`}
                       size="small"
                       sx={{
                         backgroundColor: 'rgba(167, 139, 250, 0.2)',
@@ -493,9 +665,9 @@ export default function PropertyGrid() {
                       }}
                     />
                   )}
-                  {p.bathrooms && (
+                  {property.bathrooms && (
                     <Chip 
-                      label={`${p.bathrooms} baños`}
+                      label={`${property.bathrooms} baños`}
                       size="small"
                       sx={{
                         backgroundColor: 'rgba(244, 114, 182, 0.2)',
@@ -510,7 +682,7 @@ export default function PropertyGrid() {
                 </Stack>
 
                 {/* Administración */}
-                {p.admin && (
+                {property.admin && (
                   <Typography 
                     variant="body2" 
                     sx={{ 
@@ -519,12 +691,12 @@ export default function PropertyGrid() {
                       fontSize: '0.875rem'
                     }}
                   >
-                    💳 Admin: <Box component="span" sx={{ fontWeight: 600 }}>{p.admin}</Box>
+                    💳 Admin: <Box component="span" sx={{ fontWeight: 600 }}>{property.admin}</Box>
                   </Typography>
                 )}
 
                 {/* Descripción */}
-                {p.description && (
+                {property.description && (
                   <Typography 
                     variant="body2" 
                     sx={{ 
@@ -539,7 +711,7 @@ export default function PropertyGrid() {
                       fontSize: '0.875rem'
                     }}
                   >
-                    {p.description}
+                    {property.description}
                   </Typography>
                 )}
 
@@ -547,11 +719,11 @@ export default function PropertyGrid() {
 
                 {/* Contacto y acciones */}
                 <Stack spacing={1.5}>
-                  {p.phone && (
+                  {property.phone && (
                     <Button
                       fullWidth
                       variant="outlined"
-                      href={`tel:${p.phone}`}
+                      href={`tel:${property.phone}`}
                       sx={{
                         borderColor: 'rgba(34, 197, 94, 0.5)',
                         backgroundColor: 'rgba(34, 197, 94, 0.1)',
@@ -564,15 +736,15 @@ export default function PropertyGrid() {
                         }
                       }}
                     >
-                      📞 {p.phone}
+                      📞 {property.phone}
                     </Button>
                   )}
                   
-                  {p.link && (
+                  {property.link && (
                     <Button 
                       fullWidth
                       variant="contained"
-                      href={p.link} 
+                      href={property.link} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       sx={{
