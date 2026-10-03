@@ -1,0 +1,29 @@
+# Dependencias
+node_modules/
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Builds
+dist/
+build/
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Salidas de depuración del scraping
+backend/temp_data/
+**/debug_*.html
+backend/fincaraiz_*.html
+backend/fincaraiz_*.png
+
+# Sistema / editores
+.DS_Store
+.idea/
+.vscode/
